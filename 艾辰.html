@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>错位时空 - 3D 灵魂反射 AI 全能版</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;500;900&display=swap');
+
+        :root {
+            --accent: #ffb6c1;
+            --luxury-gold: #f9d976;
+            --bg-gradient: radial-gradient(circle at center, #1a0b2e 0%, #05020a 100%);
+            --safe-bottom: env(safe-area-inset-bottom);
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            overflow: hidden;
+            background: #05020a;
+            font-family: 'Noto Serif SC', serif;
+            color: #fff;
+            user-select: none;
+            touch-action: none;
+            transition: background 3s ease;
+        }
+
+        #canvas-2d { position: absolute; top: 0; left: 0; z-index: 1; pointer-events: none; }
+        #canvas-3d { position: absolute; top: 0; left: 0; z-index: 2; }
+
+        /* 启动层 */
+        #start-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-gradient);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 10000; transition: opacity 1.5s ease;
+        }
+
+        #start-btn {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);
+            border: none; padding: 22px 65px; color: #7b2c5e;
+            font-size: 1.6rem; font-family: 'Noto Serif SC', serif;
+            letter-spacing: 12px; border-radius: 100px; cursor: pointer;
+            box-shadow: 0 15px 45px rgba(255, 182, 193, 0.5);
+            transition: all 0.5s;
+            animation: dream-float 3s infinite ease-in-out;
+        }
+
+        @keyframes dream-float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-12px); }
+        }
+
+        /* 顶部 UI 控制区 */
+        #top-bar { position: absolute; top: 25px; left: 25px; z-index: 200; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(25px);
+            padding: 15px 25px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.15);
+            display: flex; flex-direction: column; gap: 8px;
+        }
+
+        #sync-slider { width: 160px; cursor: pointer; accent-color: var(--accent); }
+
+        #key-guide {
+            position: absolute; left: 25px; bottom: 100px;
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(15px);
+            padding: 15px; border-radius: 12px; font-size: 0.7rem; color: #ffb6c1;
+            z-index: 200; border: 1px solid rgba(255,255,255,0.1);
+            pointer-events: none; line-height: 1.6;
+        }
+
+        /* AI 指挥中心 */
+        #ai-orb {
+            position: absolute; right: 25px; top: 50%;
+            transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; width: 300px; z-index: 200;
+            transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        .ai-action-btn {
+            background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 182, 193, 0.2);
+            color: #ffd1dc; padding: 10px 18px; border-radius: 18px;
+            font-size: 0.85rem; cursor: pointer; backdrop-filter: blur(30px);
+            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); display: flex; align-items: center; justify-content: space-between;
+        }
+
+        .ai-action-btn:hover { border-color: #fff; transform: translateX(-5px); background: rgba(255, 182, 193, 0.1); }
+
+        #ai-terminal {
+            background: rgba(26, 11, 46, 0.95); border-radius: 20px; padding: 18px;
+            font-size: 0.85rem; line-height: 1.7; display: none;
+            border-left: 5px solid #d4af37; color: #ffd1dc;
+            max-height: 200px; overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        #whisper-input-container { display: flex; gap: 8px; margin-top: 5px; }
+        #whisper-box {
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(212,175,55,0.3);
+            border-radius: 12px; color: #fff; padding: 10px; flex: 1; outline: none; font-size: 0.85rem;
+        }
+        #btn-whisper-send { background: #ffb6c1; border: none; border-radius: 12px; color: #7b2c5e; padding: 0 15px; cursor: pointer; font-weight: bold; }
+
+        #vision-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 11000; display: none;
+            justify-content: center; align-items: center;
+        }
+        #vision-img { max-width: 85%; max-height: 80%; border-radius: 20px; border: 2px solid #ffb6c1; }
+
+        .loading-spinner { border: 2px solid rgba(255,182,193,0.2); border-top: 2px solid #ffb6c1; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: none; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        #bottom-controls { position: absolute; bottom: calc(30px + var(--safe-bottom)); left: 50%; transform: translateX(-50%); z-index: 200; text-align: center; width: 100%; pointer-events: none; }
+        .player-status { font-size: 0.8rem; color: #ffb6c1; opacity: 0.7; letter-spacing: 5px; margin-top: 10px; }
+
+        @media (max-width: 768px) {
+            #ai-orb { bottom: calc(120px + var(--safe-bottom)); right: 5%; width: 90%; top: auto; flex-direction: row; flex-wrap: wrap; gap: 5px; }
+            .ai-action-btn { flex: 1 1 45%; padding: 8px; font-size: 0.75rem; }
+            #key-guide { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-overlay">
+        <button id="start-btn">开启灵魂反射</button>
+        <div style="margin-top: 25px; color: #ffd1dc; letter-spacing: 4px; font-size: 0.9rem; font-weight: 300;">DREAMY 3D · 26-KEY COMMAND CENTER</div>
+    </div>
+
+    <input type="file" id="audio-input-hidden" accept="audio/*" style="display:none">
+
+    <div id="vision-overlay">
+        <img id="vision-img" src="">
+        <div style="position: absolute; top: 25px; right: 25px; font-size: 2.5rem; cursor: pointer; color: #ffb6c1;" onclick="this.parentElement.style.display='none'">&times;</div>
+    </div>
+
+    <div id="top-bar">
+        <div class="glass-panel">
+            <label style="font-size: 0.7rem; color: #ffb6c1; letter-spacing: 2px;">歌词延迟校准 (SYNC)</label>
+            <input type="range" id="sync-slider" min="-2" max="10" step="0.1" value="3.3">
+            <span id="sync-val-display" style="font-size: 1rem; color: #ffb6c1; font-weight: 900;">3.3s</span>
+            <div style="font-size: 0.65rem; color: var(--luxury-gold); margin-top: 4px;" id="model-indicator">形态: 粉晶之心</div>
+        </div>
+    </div>
+
+    <div id="key-guide">
+        <b>[1-9]</b> 切换高阶 3D 立绘<br>
+        <b>[A-Z]</b> 全字母实时控制 (J震颤, P隐藏)<br>
+        <b>[C]</b> 循环切换粒子形状<br>
+        <b>长按</b> 在水面上召唤灵魂
+    </div>
+
+    <div id="ai-orb">
+        <div id="ai-terminal"></div>
+        <button class="ai-action-btn" id="btn-shape" onclick="cycleParticleShape()"><span>✨ 形状切换</span><div id="shape-name" style="font-size: 0.65rem; opacity: 0.8;">ROUND</div></button>
+        <button class="ai-action-btn" id="btn-scribe" onclick="runInscription()"><span>✨ 时空铭刻</span><div class="loading-spinner" id="spin-scribe"></div></button>
+        <button class="ai-action-btn" id="btn-weaver" onclick="runDreamWeaver()"><span>✨ 梦境续写</span><div class="loading-spinner" id="spin-weaver"></div></button>
+        <button class="ai-action-btn" id="btn-oracle" onclick="runOracle()"><span>🌸 宿命占卜</span><div class="loading-spinner" id="spin-oracle"></div></button>
+        <button class="ai-action-btn" id="btn-color" onclick="runMoodSync()"><span>🌈 空间重构</span><div class="loading-spinner" id="spin-color"></div></button>
+        <button class="ai-action-btn" id="btn-vision" onclick="runImageGen()"><span>🎨 星尘映画</span><div class="loading-spinner" id="spin-vision"></div></button>
+        <button class="ai-action-btn" id="btn-voice" onclick="runAIVoice()"><span>🍯 蜜语心声</span><div class="loading-spinner" id="spin-voice"></div></button>
+        <div id="whisper-input-container">
+            <input type="text" id="whisper-box" placeholder="输入指令或私语..." autocomplete="off">
+            <button id="btn-whisper-send" onclick="runWhisper()">发送</button>
+        </div>
+    </div>
+
+    <div id="bottom-controls">
+        <div style="font-size: 1.1rem; letter-spacing: 8px; font-weight: 500; color: #ffd1dc;">错位时空 · 艾辰</div>
+        <div class="player-status">P 隐藏面板 · J 震颤 · A-Z 已全部补全</div>
+    </div>
+
+    <audio id="bgm" loop playsinline></audio>
+
+    <canvas id="canvas-2d"></canvas>
+    <div id="canvas-3d"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        const canvas2d = document.getElementById('canvas-2d');
+        const ctx2d = canvas2d.getContext('2d');
+        const bgm = document.getElementById('bgm');
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const fileInput = document.getElementById('audio-input-hidden');
+        const aiTerminal = document.getElementById('ai-terminal');
+        const syncSlider = document.getElementById('sync-slider');
+        const syncValDisplay = document.getElementById('sync-val-display');
+        
+        let width, height;
+        let particles = [];
+        let stars = [];
+        let particleCount = window.innerWidth < 768 ? 150 : 350; 
+        let isHolding = false;
+        let mouse = { x: -1000, y: -1000 };
+        let baseHue = 330;
+        let lyricOffset = 3.3; 
+        
+        let audioCtx, analyser, dataArray, sourceNode;
+        let freqData = { low: 0 };
+        let isStarted = false;
+        const apiKey = ""; 
+
+        // --- 全局粒子与状态控制变量 ---
+        let pGlobalSpeed = 1.0;
+        let pGlobalSize = 1.0;
+        let pGlobalHueShift = 0;
+        let pGravityDir = 1;
+        let pDispersion = 0.1;
+        let pRainbowMode = false;
+        let pJitter = 0;
+        let pRotationFactor = 0; // 新增：粒子自转强度
+        let pNoiseScale = 0; // 新增：路径噪声扰动
+        let pOpacity = 0.3; // 粒子透明度
+        let currentShape = 'round';
+        const shapes = ['round', 'heart', 'star', 'sparkle'];
+
+        function logToTerminal(msg, title = "系统指令") {
+            aiTerminal.style.display = 'block';
+            aiTerminal.innerHTML = `<small style="color:var(--luxury-gold)">[${title}]</small><br>${msg}`;
+            aiTerminal.scrollTop = aiTerminal.scrollHeight;
+        }
+
+        // --- Three.js 核心引擎 ---
+        let scene, camera, renderer, mainModel, modelReflection, spotlight, water;
+        let lyricMesh, reflectMesh, lyricTexture, lyricCanvas, lyricCtx;
+        let modelGeometries = [];
+        let modelNames = ["粉晶之心", "交错维度", "永恒玫瑰", "双子星核", "皇室璀璨钻", "誓约指环", "无尽之爱", "时空之翼", "缠绕情丝"];
+
+        function init3D() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            camera.position.set(0, 2.5, 8.5);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            document.getElementById('canvas-3d').appendChild(renderer.domElement);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            spotlight = new THREE.PointLight(0xffb6c1, 0, 60);
+            scene.add(spotlight);
+
+            lyricCanvas = document.createElement('canvas');
+            lyricCanvas.width = 1024; lyricCanvas.height = 256;
+            lyricCtx = lyricCanvas.getContext('2d');
+            lyricTexture = new THREE.CanvasTexture(lyricCanvas);
+            
+            const lyricGeom = new THREE.PlaneGeometry(8, 2);
+            lyricMesh = new THREE.Mesh(lyricGeom, new THREE.MeshPhongMaterial({ map: lyricTexture, transparent: true, opacity: 0, shininess: 100, emissive: 0xffffff, emissiveIntensity: 0.1 }));
+            lyricMesh.position.y = 1.3;
+            scene.add(lyricMesh);
+
+            water = new THREE.Mesh(new THREE.PlaneGeometry(25, 25), new THREE.MeshPhongMaterial({ color: 0x0a0515, transparent: true, opacity: 0.7, shininess: 200 }));
+            water.rotation.x = -Math.PI / 2; water.position.y = -2;
+            scene.add(water);
+
+            reflectMesh = new THREE.Mesh(lyricGeom, new THREE.MeshPhongMaterial({ map: lyricTexture, transparent: true, opacity: 0, color: 0x666666 }));
+            reflectMesh.rotation.x = Math.PI; reflectMesh.position.y = -5.3; 
+            scene.add(reflectMesh);
+
+            precomputeGeometries();
+            createMainModel(0);
+        }
+
+        function precomputeGeometries() {
+            const heartShape = new THREE.Shape();
+            heartShape.moveTo(0, -0.5); heartShape.bezierCurveTo(0, -0.5, -0.1, 0.1, -0.5, 0.1);
+            heartShape.bezierCurveTo(-1.1, 0.1, -1.1, -0.6, -1.1, -0.6); heartShape.bezierCurveTo(-1.1, -1, -0.8, -1.44, 0, -1.9);
+            heartShape.bezierCurveTo(0.8, -1.44, 1.1, -1, 1.1, -0.6); heartShape.bezierCurveTo(1.1, -0.6, 1.1, 0.1, 0.5, 0.1);
+            heartShape.bezierCurveTo(0.1, 0.1, 0, -0.5, 0, -0.5);
+            const heartGeom = new THREE.ExtrudeGeometry(heartShape, { depth: 0.4, bevelEnabled: true, bevelSize: 0.1, bevelThickness: 0.1 });
+            heartGeom.center();
+            modelGeometries = [heartGeom, heartGeom, new THREE.TorusKnotGeometry(0.6, 0.25, 150, 20, 2, 3), new THREE.DodecahedronGeometry(1, 0), new THREE.IcosahedronGeometry(1.2, 1), new THREE.TorusGeometry(0.85, 0.08, 16, 100), new THREE.TorusKnotGeometry(0.8, 0.15, 200, 20, 1, 3), new THREE.TorusKnotGeometry(0.7, 0.05, 128, 32, 2, 5), new THREE.TorusKnotGeometry(0.7, 0.12, 100, 16)];
+        }
+
+        function createMainModel(index) {
+            const colorMap = [0xffb6c1, 0xf9d976, 0xff1493, 0x00ffff, 0xffffff, 0xd4af37, 0xffb6c1, 0xe0b0ff, 0xff9a9e];
+            if (mainModel) scene.remove(mainModel);
+            if (modelReflection) scene.remove(modelReflection);
+            mainModel = new THREE.Mesh(modelGeometries[index], new THREE.MeshPhongMaterial({ color: colorMap[index], wireframe: index === 1, transparent: true, opacity: 0, shininess: 150, reflectivity: 1.0 }));
+            mainModel.scale.set(0.01, 0.01, 0.01);
+            scene.add(mainModel);
+            modelReflection = new THREE.Mesh(modelGeometries[index], new THREE.MeshPhongMaterial({ color: colorMap[index], wireframe: index === 1, transparent: true, opacity: 0, color: 0x444444 }));
+            modelReflection.scale.set(0.01, 0.01, 0.01); modelReflection.rotation.x = Math.PI;
+            scene.add(modelReflection);
+            document.getElementById('model-indicator').innerText = `形态: ${modelNames[index]}`;
+        }
+
+        function update3DLyric(text) {
+            if(!lyricCtx) return;
+            lyricCtx.clearRect(0, 0, 1024, 256);
+            const grad = lyricCtx.createLinearGradient(0, 0, 1024, 0);
+            grad.addColorStop(0, '#fff'); grad.addColorStop(0.3, '#f9d976'); grad.addColorStop(0.5, '#ffb6c1'); grad.addColorStop(0.7, '#e0b0ff'); grad.addColorStop(1, '#fff');
+            lyricCtx.fillStyle = grad; lyricCtx.textAlign = "center"; lyricCtx.textBaseline = "middle"; lyricCtx.font = "900 80px 'Noto Serif SC'";
+            lyricCtx.shadowColor = "rgba(255, 182, 193, 0.6)"; lyricCtx.shadowBlur = 20;
+            lyricCtx.fillText(text, 512, 128); lyricTexture.needsUpdate = true;
+        }
+
+        // --- 核心：补全 26 字母全键位控制系统 ---
+        window.addEventListener('keydown', (e) => {
+            if(!isStarted || e.target.tagName === 'INPUT') return;
+            const key = e.key;
+            if (key >= '1' && key <= '9') { createMainModel(parseInt(key)-1); logToTerminal(`模型进化: ${modelNames[parseInt(key)-1]}`); return; }
+            
+            const k = key.toLowerCase();
+            const panel = document.getElementById('ai-orb');
+
+            switch(k) {
+                // A-Z 补全计划
+                case 'a': pGlobalHueShift -= 15; logToTerminal("色谱冷调偏移"); break;
+                case 'b': particles.forEach(p => { p.vx *= 12; p.vy *= 12; }); logToTerminal("星爆脉冲激活"); break;
+                case 'c': cycleParticleShape(); logToTerminal(`形状变换: ${currentShape.toUpperCase()}`); break;
+                case 'd': pGlobalHueShift += 15; logToTerminal("色谱暖调偏移"); break;
+                case 'e': pGlobalSize = Math.max(0.2, pGlobalSize - 0.2); logToTerminal("粒子坍缩缩放"); break;
+                case 'f': pDispersion = pDispersion === 0.1 ? 0.3 : 0.1; logToTerminal("扩散常数扰动"); break;
+                case 'g': pGravityDir *= -1; logToTerminal("重力反转"); break;
+                case 'h': isHolding = !isHolding; logToTerminal(`核心锁定: ${isHolding?'ON':'OFF'}`); break;
+                case 'i': pGlobalSpeed *= -1; logToTerminal("时间轴逆流"); break;
+                case 'j': pJitter = 15; logToTerminal("高频时空震颤"); break; // 修复 J 键
+                case 'k': camera.fov = camera.fov === 45 ? 65 : 45; camera.updateProjectionMatrix(); logToTerminal("广角视角切换"); break;
+                case 'l': spotlight.intensity = spotlight.intensity === 60 ? 160 : 60; logToTerminal("圣光强度调节"); break;
+                case 'm': logToTerminal("分析情绪重构空间..."); runMoodSync(); break;
+                case 'n': pNoiseScale = pNoiseScale === 0 ? 5 : 0; logToTerminal(`路径噪声: ${pNoiseScale?'开启':'关闭'}`); break;
+                case 'o': pOpacity = pOpacity === 0.3 ? 0.8 : 0.3; logToTerminal("粒子明度增强"); break;
+                case 'p': // P 键隐藏面板
+                    const isVisible = panel.style.opacity !== '0';
+                    panel.style.opacity = isVisible ? '0' : '1';
+                    panel.style.pointerEvents = isVisible ? 'none' : 'auto';
+                    panel.style.transform = isVisible ? 'translateY(-50%) translateX(50px)' : 'translateY(-50%) translateX(0)';
+                    logToTerminal(`视觉面板已${isVisible ? '隐藏' : '显示'}`);
+                    break;
+                case 'q': pGlobalSize += 0.2; logToTerminal("粒子膨胀增强"); break;
+                case 'r': pRainbowMode = !pRainbowMode; logToTerminal(`幻彩模式: ${pRainbowMode?'开启':'关闭'}`); break;
+                case 's': pGlobalSpeed = Math.max(0.1, pGlobalSpeed - 0.3); logToTerminal("减缓时空流速"); break;
+                case 't': logToTerminal("时空铭刻初始化..."); runInscription(); break;
+                case 'u': water.material.opacity = water.material.opacity === 0.7 ? 0.1 : 0.7; logToTerminal("水面通透度调节"); break;
+                case 'v': pRotationFactor = pRotationFactor === 0 ? 0.05 : 0; logToTerminal(`旋涡力场: ${pRotationFactor?'开启':'关闭'}`); break;
+                case 'w': pGlobalSpeed += 0.3; logToTerminal("提升时空流速"); break;
+                case 'x': mainModel.material.wireframe = !mainModel.material.wireframe; logToTerminal("透视矩阵开启"); break;
+                case 'y': stars.forEach(s => s.o = Math.random()); logToTerminal("背景繁星重组"); break;
+                case 'z': pGlobalSpeed=1; pGlobalHueShift=0; pGlobalSize=1; pGravityDir=1; pRainbowMode=false; pJitter=0; pRotationFactor=0; pNoiseScale=0; pOpacity=0.3; logToTerminal("系统归位·全属性重置"); break;
+                default: logToTerminal(`捕获未知指令: ${key.toUpperCase()}`, "未知键位");
+            }
+        });
+
+        // --- 2D 粒子系统实现 ---
+        function drawCanvasHeart(ctx, x, y, size) {
+            ctx.beginPath(); ctx.moveTo(x, y + size * 0.3);
+            ctx.bezierCurveTo(x, y, x - size, y, x - size, y + size * 0.5); ctx.bezierCurveTo(x - size, y + size, x, y + size * 1.5, x, y + size * 1.7);
+            ctx.bezierCurveTo(x, y + size * 1.5, x + size, y + size, x + size, y + size * 0.5); ctx.bezierCurveTo(x + size, y, x, y, x, y + size * 0.3); ctx.fill();
+        }
+        function drawCanvasStar(ctx, x, y, r) { ctx.beginPath(); for(let i=0;i<5;i++){ ctx.lineTo(x+r*Math.cos((18+i*72)*Math.PI/180), y-r*Math.sin((18+i*72)*Math.PI/180)); ctx.lineTo(x+r*0.4*Math.cos((54+i*72)*Math.PI/180), y-r*0.4*Math.sin((54+i*72)*Math.PI/180)); } ctx.closePath(); ctx.fill(); }
+        function drawCanvasSparkle(ctx, x, y, r) { ctx.beginPath(); ctx.moveTo(x, y-r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.quadraticCurveTo(x,y,x,y+r); ctx.quadraticCurveTo(x,y,x-r,y); ctx.quadraticCurveTo(x,y,x,y-r); ctx.fill(); }
+
+        class Particle {
+            constructor(id) { this.id = id; this.reset(); }
+            reset() { this.x = Math.random()*width; this.y = Math.random()*height; this.vx = (Math.random()-0.5)*1.5; this.vy = (Math.random()-0.5)*1.5; this.t = Math.random()*Math.PI*2; this.hue = baseHue + Math.random()*30; }
+            update(f) {
+                const s = freqData.low;
+                let nx = (Math.random()-0.5) * pNoiseScale;
+                let ny = (Math.random()-0.5) * pNoiseScale;
+                let tx_jitter = (Math.random()-0.5) * pJitter;
+                let ty_jitter = (Math.random()-0.5) * pJitter;
+
+                if (isHolding) {
+                    const tx = mouse.x + 16 * Math.pow(Math.sin(this.t), 3) * (20+s/15);
+                    const ty = mouse.y - (13*Math.cos(this.t)-5*Math.cos(2*this.t)-2*Math.cos(3*this.t)-Math.cos(4*this.t)) * (20+s/15);
+                    this.vx += (tx-this.x)*pDispersion; this.vy += (ty-this.y)*pDispersion;
+                } else {
+                    this.vx += Math.cos(this.t+f*0.01)*0.05 * pGlobalSpeed;
+                    this.vy += (Math.sin(this.t+f*0.01)*0.05 + 0.05*pGravityDir) * pGlobalSpeed;
+                    // 旋涡效果
+                    if(pRotationFactor > 0) {
+                        const dx = this.x - width/2; const dy = this.y - height/2;
+                        this.vx -= dy * pRotationFactor; this.vy += dx * pRotationFactor;
+                    }
+                }
+                this.x += this.vx + tx_jitter + nx; this.y += this.vy + ty_jitter + ny;
+                this.vx*=0.98; this.vy*=0.98;
+                if(this.x<-100) this.x=width+100; if(this.x>width+100) this.x=-100;
+                if(this.y<-100) this.y=height+100; if(this.y>height+100) this.y=-100;
+            }
+            draw() {
+                const h = pRainbowMode ? (Date.now()*0.1 % 360) : (this.hue + pGlobalHueShift);
+                ctx2d.fillStyle = `hsla(${h}, 70%, 85%, ${isHolding?pOpacity+0.2:pOpacity})`;
+                const s = 1.8 * (1 + freqData.low/300) * pGlobalSize;
+                if(currentShape==='heart') drawCanvasHeart(ctx2d, this.x, this.y, s);
+                else if(currentShape==='star') drawCanvasStar(ctx2d, this.x, this.y, s*2);
+                else if(currentShape==='sparkle') drawCanvasSparkle(ctx2d, this.x, this.y, s*2.5);
+                else { ctx2d.beginPath(); ctx2d.arc(this.x, this.y, s, 0, Math.PI*2); ctx2d.fill(); }
+            }
+        }
+
+        // --- 驱动逻辑 ---
+        syncSlider.oninput = function() { lyricOffset = parseFloat(this.value); syncValDisplay.innerText = lyricOffset.toFixed(1) + 's'; };
+        startBtn.onclick = () => fileInput.click();
+        fileInput.onchange = function(e) {
+            const f = e.target.files[0]; if(!f) return;
+            bgm.src = URL.createObjectURL(f); bgm.load();
+            bgm.play().then(() => { initAudioContext(); isStarted = true; startOverlay.style.opacity = '0'; setTimeout(() => startOverlay.style.display = 'none', 1000); });
+        };
+        async function initAudioContext() { if(audioCtx) { if(audioCtx.state === 'suspended') await audioCtx.resume(); return; } audioCtx = new (window.AudioContext || window.webkitAudioContext)(); analyser = audioCtx.createAnalyser(); sourceNode = audioCtx.createMediaElementSource(bgm); sourceNode.connect(analyser); analyser.connect(audioCtx.destination); analyser.fftSize = 128; dataArray = new Uint8Array(analyser.frequencyBinCount); }
+        function init() { width = canvas2d.width = window.innerWidth; height = canvas2d.height = window.innerHeight; particles = Array.from({length: particleCount}, (_, i) => new Particle(i)); stars = Array.from({length: 100}, () => ({x:Math.random()*width, y:Math.random()*height, o:Math.random()*0.2+0.1})); if (!scene) init3D(); else { renderer.setSize(width, height); camera.aspect = width/height; camera.updateProjectionMatrix(); } }
+        
+        function animate() {
+            ctx2d.fillStyle = 'rgba(5, 2, 10, 0.3)'; ctx2d.fillRect(0,0,width,height);
+            ctx2d.fillStyle = '#fff'; stars.forEach(s => { ctx2d.globalAlpha=s.o; ctx2d.beginPath(); ctx2d.arc(s.x, s.y, 1, 0, Math.PI*2); ctx2d.fill(); }); ctx2d.globalAlpha=1;
+            if (analyser) { analyser.getByteFrequencyData(dataArray); let l=0; for(let i=0; i<10; i++) l+=dataArray[i]; freqData.low = l/10; }
+            particles.forEach(p => { p.update(Date.now()*0.05); p.draw(); });
+            if(pJitter > 0) pJitter *= 0.92;
+            if (isStarted) {
+                const ripple = Math.sin(Date.now()*0.005) * (freqData.low / 255); water.position.y = -2 + ripple * 0.12;
+                lyricMesh.position.y = 1.3 + Math.sin(Date.now()*0.001)*0.2; lyricMesh.material.opacity = THREE.MathUtils.lerp(lyricMesh.material.opacity, 1.0, 0.05);
+                reflectMesh.material.opacity = lyricMesh.material.opacity * 0.25; reflectMesh.position.y = -lyricMesh.position.y - 4.0;
+                if (isHolding) {
+                    mainModel.material.opacity = Math.min(0.85, mainModel.material.opacity+0.05); modelReflection.material.opacity = mainModel.material.opacity * 0.3;
+                    const beat = 1.25 + (freqData.low/255)*0.55; mainModel.scale.lerp(new THREE.Vector3(beat, beat, beat), 0.15); modelReflection.scale.copy(mainModel.scale);
+                    mainModel.rotation.y += 0.02; modelReflection.rotation.y = mainModel.rotation.y; spotlight.intensity = (freqData.low / 255) * 8;
+                    const vec = new THREE.Vector3((mouse.x/width)*2-1, -(mouse.y/height)*2+1, 0.5).unproject(camera); const dir = vec.sub(camera.position).normalize();
+                    mainModel.position.lerp(camera.position.clone().add(dir.multiplyScalar(-camera.position.z/dir.z)), 0.15); modelReflection.position.set(mainModel.position.x, -mainModel.position.y - 4.0, mainModel.position.z); spotlight.position.copy(mainModel.position);
+                } else { mainModel.material.opacity = Math.max(0, mainModel.material.opacity-0.08); modelReflection.material.opacity = 0; mainModel.scale.lerp(new THREE.Vector3(0.001, 0.001, 0.001), 0.1); spotlight.intensity *= 0.82; }
+            }
+            renderer.render(scene, camera); requestAnimationFrame(animate);
+        }
+
+        const lrcData = `[00:00.00]错位时空 - 艾辰\n[00:13.25]填不满半排观众的电影\n[00:17.06]直到散场时突然亮起灯\n[00:20.61]字幕定格在某某出品 and 发行\n[00:24.47]我目送他们行色匆匆\n[00:27.97]像个自不量力的复读生\n[00:31.75]完不成金榜题名的使命\n[00:35.39]命不是猜剪刀石头布的决定\n[00:39.19]那么任性\n[00:41.34]我吹过你吹过的晚风\n[00:44.89]那我们算不算 相拥\n[00:48.51]可如梦初醒般的两手空空\n[00:52.36]心也空\n[00:56.09]我吹过你吹过的晚风\n[00:59.62]是否看过同样风景\n[01:03.38]像扰乱时差留在错位时空\n[01:08.57]终是空 是空\n[01:27.18]数不完见证许愿的繁星\n[01:30.95]没灵验谁来安慰坏心情\n[01:34.42]十字路口闪烁不停的信号灯\n[01:38.27]有个人显然心事重重\n[01:41.97]三个字只能说给自己听\n[01:45.66]仰着头不要让眼泪失控\n[01:49.23]哪里有可以峰回路转的宿命\n[01:53.05]我不想听\n[01:55.19]我吹过你吹过的晚风\n[01:58.74]那我们算不算 相拥\n[02:02.39]可如梦初醒般的两手空空\n[02:06.20]心也空\n[02:09.91]我吹过你吹过的晚风\n[02:13.51]是否看过同样风景\n[02:17.16]像扰乱时差留在错位时空\n[02:22.38]终 is 空 是空\n[02:24.81]我吹过你吹过的晚风\n[02:28.32]空气里弥漫着 心痛\n[02:31.97]可我们最后 在这错位时空\n[02:35.77]终成空 成空\n[02:39.51]我吹过你吹过的晚风\n[02:43.08]是否看过同样风景\n[02:46.72]像扰乱时差留在错位时空\n[02:51.92]终是空 是空`;
+        const lyricsArr = lrcData.trim().split('\n').map(l => { const m = l.match(/\[(\d+):(\d+\.\d+)\](.*)/); return m ? { t: parseInt(m[1])*60 + parseFloat(m[2]), txt: m[3].trim() } : null; }).filter(x => x && x.txt);
+        let lastIdx = -1;
+        bgm.ontimeupdate = () => { const cur = bgm.currentTime; let idx = -1; for(let i=0; i<lyricsArr.length; i++) { if (cur >= lyricsArr[i].t + lyricOffset) idx = i; else break; } if (idx !== -1 && idx !== lastIdx) { lastIdx = idx; if(lyricMesh) { lyricMesh.material.opacity = 0; update3DLyric(lyricsArr[idx].txt); } } };
+        const handleInteraction = (e) => { if(!isStarted) return; initAudioContext(); const touch = e.touches ? e.touches[0] : e; if(!e.target.closest('button') && !e.target.closest('input')) isHolding = true; mouse.x = touch.clientX; mouse.y = touch.clientY; };
+        window.addEventListener('mousedown', handleInteraction); window.addEventListener('mouseup', () => isHolding = false); window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; }); window.addEventListener('touchstart', (e) => { handleInteraction(e); }); window.addEventListener('touchend', () => isHolding = false); window.addEventListener('resize', init); init(); animate();
+
+        // --- Gemini 集成 ---
+        async function callGemini(p, mode="text") {
+            const model = mode==="tts"?"gemini-2.5-flash-preview-tts":"gemini-2.5-flash-preview-09-2025";
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const payload = { contents: [{ parts: [{ text: p }] }], systemInstruction: { parts: [{ text: "你是一位极其温柔、优雅的星际诗人。" }]} };
+            if(mode==="tts") payload.generationConfig = { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } };
+            if(mode==="json") payload.generationConfig = { responseMimeType: "application/json", responseSchema: { type: "OBJECT", properties: { hue: { type: "NUMBER" }, reason: { type: "STRING" }, gradient: { type: "STRING" } } } };
+            let retries = 3; while(retries > 0) { try { const r = await fetch(url, { method: "POST", body: JSON.stringify(payload) }); return await r.json(); } catch(e) { retries--; if(retries===0) throw e; await new Promise(res => setTimeout(res, 1000)); } }
+        }
+        async function runInscription() { const box = document.getElementById('whisper-box'); const content = box.value || "无名旅人"; box.value = ""; document.getElementById('spin-scribe').style.display='block'; try { const d = await callGemini(`为这段记忆撰写铭文：'${content}'。`); logToTerminal(d.candidates[0].content.parts[0].text, "时空铭刻"); } catch(e) {} document.getElementById('spin-scribe').style.display='none'; }
+        async function runDreamWeaver() { document.getElementById('spin-weaver').style.display='block'; try { const t = lyricsArr[lastIdx]?.txt || "错位时空"; const d = await callGemini(`意境“${t}”，续写电影感旁白。`); logToTerminal(d.candidates[0].content.parts[0].text, "梦境续写"); } catch(e) {} document.getElementById('spin-weaver').style.display='none'; }
+        async function runOracle() { initAudioContext(); document.getElementById('spin-oracle').style.display='block'; try { const d = await callGemini(`当前意境“${lyricsArr[lastIdx]?.txt || '错位时空'}”，进行梦幻占卜。`); logToTerminal(d.candidates[0].content.parts[0].text, "宿命感应"); } catch(e) {} document.getElementById('spin-oracle').style.display='none'; }
+        async function runMoodSync() { document.getElementById('spin-color').style.display='block'; try { const d = await callGemini(`情绪分析，返回HSL和CSS渐变。`, "json"); const res = JSON.parse(d.candidates[0].content.parts[0].text); baseHue = res.hue; document.body.style.background = res.gradient; logToTerminal(res.reason, "维度重构"); } catch(e){} document.getElementById('spin-color').style.display='none'; }
+        async function runAIVoice() { initAudioContext(); document.getElementById('spin-voice').style.display='block'; try { const d = await callGemini(`写一段温柔告白并朗读。`, "tts"); const pcm = d.candidates[0].content.parts[0].inlineData.data; const bin = atob(pcm); const bytes = new Uint8Array(bin.length); for (let i=0; i<bin.length; i++) bytes[i]=bin.charCodeAt(i); const h = new ArrayBuffer(44); const v = new DataView(h); const writeS = (o, str) => { for (let i=0; i<str.length; i++) v.setUint8(o+i, str.charCodeAt(i)); }; writeS(0, 'RIFF'); v.setUint32(4, 32 + bin.length, true); writeS(8, 'WAVE'); writeS(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 24000, true); v.setUint32(28, 48000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); writeS(36, 'data'); v.setUint32(40, bin.length, true); new Audio(URL.createObjectURL(new Blob([h, bytes], { type: 'audio/wav' }))).play(); } catch(e){} document.getElementById('spin-voice').style.display='none'; }
+        async function runImageGen() { document.getElementById('spin-vision').style.display='block'; try { const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`, { method: "POST", body: JSON.stringify({ instances: { prompt: `Luxury 3D heart with glowing reflections on water surface, cinema 8k.` }, parameters: { sampleCount: 1 } }) }); const d = await res.json(); document.getElementById('vision-img').src = `data:image/png;base64,${d.predictions[0].bytesBase64Encoded}`; document.getElementById('vision-overlay').style.display='flex'; } catch(e){} document.getElementById('spin-vision').style.display='none'; }
+        async function runWhisper() { initAudioContext(); const box = document.getElementById('whisper-box'); const msg = box.value; if(!msg) return; box.value = ""; box.blur(); logToTerminal("信件已寄出..."); try { const d = await callGemini(`用户说：“${msg}”。请回应。`); logToTerminal(d.candidates[0].content.parts[0].text, "时空回响"); } catch(e) {} }
+        function cycleParticleShape() { const idx = shapes.indexOf(currentShape); currentShape = shapes[(idx + 1) % shapes.length]; document.getElementById('shape-name').innerText = currentShape.toUpperCase(); }
+    </script>
+</body>
+</html>
